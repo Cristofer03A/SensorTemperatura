@@ -1,0 +1,140 @@
+#include "dht.h"
+
+/////////////////////////////////////////////////////
+//
+// PUBLIC
+//
+
+// Método para leer datos del sensor DHT11
+int dht::read11(uint8_t pin)
+{
+    // LEER VALORES
+    int rv = _readSensor(pin, DHTLIB_DHT11_WAKEUP);
+    if (rv != DHTLIB_OK)
+    {
+        humidity    = DHTLIB_INVALID_VALUE; // valor inválido, o se prefiere NaN?
+        temperature = DHTLIB_INVALID_VALUE; // valor inválido
+        return rv;
+    }
+
+    // CONVERTIR Y ALMACENAR
+    humidity    = bits[0];  // bits[1] == 0;
+    temperature = bits[2];  // bits[3] == 0;
+
+    // VERIFICAR SUMA DE COMPROBACIÓN
+    // bits[1] && bits[3] ambos son 0
+    uint8_t sum = bits[0] + bits[2];
+    if (bits[4] != sum) return DHTLIB_ERROR_CHECKSUM;
+
+    return DHTLIB_OK;
+}
+
+
+// Método para leer datos del sensor DHT
+int dht::read(uint8_t pin)
+{
+    // LEER VALORES
+    int rv = _readSensor(pin, DHTLIB_DHT_WAKEUP);
+    if (rv != DHTLIB_OK)
+    {
+        humidity    = DHTLIB_INVALID_VALUE;  // valor inválido, o se prefiere NaN?
+        temperature = DHTLIB_INVALID_VALUE;  // valor inválido
+        return rv; // propagar valor de error
+    }
+
+    // CONVERTIR Y ALMACENAR
+    humidity = word(bits[0], bits[1]) * 0.1;
+    temperature = word(bits[2] & 0x7F, bits[3]) * 0.1;
+    if (bits[2] & 0x80)  // temperatura negativa
+    {
+        temperature = -temperature;
+    }
+
+    // VERIFICAR SUMA DE COMPROBACIÓN
+    uint8_t sum = bits[0] + bits[1] + bits[2] + bits[3];
+    if (bits[4] != sum)
+    {
+        return DHTLIB_ERROR_CHECKSUM;
+    }
+    return DHTLIB_OK;
+}
+
+/////////////////////////////////////////////////////
+//
+// PRIVATE
+//
+
+// Método privado para leer datos del sensor DHT
+int dht::_readSensor(uint8_t pin, uint8_t wakeupDelay)
+{
+    // INICIALIZAR BUFFER PARA RECIBIR DATOS
+    uint8_t mask = 128;
+    uint8_t idx = 0;
+
+    // Reemplazar digitalRead() con Lecturas Directas del Puerto.
+    // Reduce el tamaño ~100 bytes => ¿problema de portabilidad?
+    // La lectura directa del puerto es aproximadamente 3 veces más rápida
+	uint8_t bit = digitalPinToBitMask(pin);
+	uint8_t port = digitalPinToPort(pin);
+    volatile uint8_t *PIR = portInputRegister(port);
+
+    // VACIAR BUFFER
+    for (uint8_t i = 0; i < 5; i++) bits[i] = 0;
+
+    // SOLICITAR MUESTRA
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, LOW); // T-be 
+    delay(wakeupDelay);
+    digitalWrite(pin, HIGH);   // T-go
+    delayMicroseconds(40);
+    pinMode(pin, INPUT);
+
+    // OBTENER ACKNOWLEDGE o TIMEOUT
+    uint16_t loopCntLOW = DHTLIB_TIMEOUT;
+    while ((*PIR & bit) == LOW )  // T-rel
+    {
+        if (--loopCntLOW == 0) return DHTLIB_ERROR_TIMEOUT;
+    }
+
+    uint16_t loopCntHIGH = DHTLIB_TIMEOUT;
+    while ((*PIR & bit) != LOW )  // T-reh
+    {
+        if (--loopCntHIGH == 0) return DHTLIB_ERROR_TIMEOUT;
+    }
+
+    // LEER LA SALIDA - 40 BITS => 5 BYTES
+    for (uint8_t i = 40; i != 0; i--)
+    {
+        loopCntLOW = DHTLIB_TIMEOUT;
+        while ((*PIR & bit) == LOW )
+        {
+            if (--loopCntLOW == 0) return DHTLIB_ERROR_TIMEOUT;
+        }
+
+        uint32_t t = micros();
+
+        loopCntHIGH = DHTLIB_TIMEOUT;
+        while ((*PIR & bit) != LOW )
+        {
+            if (--loopCntHIGH == 0) return DHTLIB_ERROR_TIMEOUT;
+        }
+
+        if ((micros() - t) > 40)
+        { 
+            bits[idx] |= mask;
+        }
+        mask >>= 1;
+        if (mask == 0)   // ¿siguiente byte?
+        {
+            mask = 128;
+            idx++;
+        }
+    }
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, HIGH);
+
+    return DHTLIB_OK;
+}
+//
+// FIN DEL ARCHIVO
+//
