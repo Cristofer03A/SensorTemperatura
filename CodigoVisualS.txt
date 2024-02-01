@@ -1,0 +1,58 @@
+// Este es el archivo de encabezado (header file) para la biblioteca DHT.
+// Se utiliza para interactuar con el sensor DHT y obtener lecturas de temperatura y humedad en un entorno Arduino.
+
+#ifndef dht_h
+#define dht_h
+
+// Verifica la versión de Arduino para incluir la biblioteca adecuada
+#if ARDUINO < 100
+#include <WProgram.h>
+#else
+#include <Arduino.h>
+#endif
+
+// Versión de la biblioteca DHT
+#define DHT_LIB_VERSION "0.1.14"
+
+// Definiciones de códigos de retorno de la biblioteca DHT
+#define DHTLIB_OK                0
+#define DHTLIB_ERROR_CHECKSUM   -1
+#define DHTLIB_ERROR_TIMEOUT    -2
+#define DHTLIB_INVALID_VALUE    -999
+
+// Tiempos de espera para activar el sensor DHT
+#define DHTLIB_DHT11_WAKEUP     18
+#define DHTLIB_DHT_WAKEUP       1
+
+// El tiempo máximo de espera es 100 microsegundos.
+// Para un procesador de 16 MHz, 100 microsegundos son 1600 ciclos de reloj.
+// Los bucles que utilizan DHTLIB_TIMEOUT utilizan al menos 4 ciclos de reloj.
+// Por lo tanto, 100 microsegundos toman como máximo 400 bucles.
+// Dividiendo F_CPU por 40000 "fallamos" tan rápido como sea posible.
+#define DHTLIB_TIMEOUT (F_CPU/40000)
+
+// Declaración de la clase dht que contendrá métodos y variables para interactuar con el sensor DHT
+class dht
+{
+public:
+    // Métodos para leer datos del sensor
+    int read11(uint8_t pin);
+    int read(uint8_t pin);
+
+    // Métodos adicionales que son alias para read con nombres diferentes
+    inline int read21(uint8_t pin) { return read(pin); };
+    inline int read22(uint8_t pin) { return read(pin); };
+    inline int read33(uint8_t pin) { return read(pin); };
+    inline int read44(uint8_t pin) { return read(pin); };
+
+    // Variables para almacenar los valores de humedad y temperatura leídos del sensor
+    double humidity;
+    double temperature;
+
+private:
+    uint8_t bits[5];  // buffer para recibir datos
+    int _readSensor(uint8_t pin, uint8_t wakeupDelay);
+};
+#endif
+
+// Fin del archivo de encabezado
