@@ -1,0 +1,23 @@
+#include <dht.h>  // Incluye la biblioteca DHT para trabajar con el sensor
+dht DHT;          // Crea un objeto DHT para interactuar con la biblioteca
+#define DHT11_PIN 8 // Define el pin al cual está conectado el sensor DHT11
+
+void setup(){
+  Serial.begin(9600);  // Inicia la comunicación serial a 9600 baudios para la salida de datos
+}
+
+void loop()
+{
+  DHT.read11(DHT11_PIN);  // Lee los datos del sensor DHT11 conectado al pin DHT11_PIN
+
+  //TEMPERATURA//
+  Serial.print("Temperatura = ");
+  Serial.print(DHT.temperature);  // Imprime la temperatura en grados Celsius
+  Serial.println(" C");
+
+  //HUMEDAD RELATIVA//
+  Serial.print("Humedad = ");
+  Serial.print(DHT.humidity);  // Imprime la humedad relativa en porcentaje
+  Serial.println(" %");
+  delay(2000);  // Espera 2 segundos antes de realizar la siguiente lectura
+}
